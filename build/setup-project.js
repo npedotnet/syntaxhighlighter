@@ -12,20 +12,33 @@ export default function (gulp, rootPath) {
   function loadReposFromGitHub() {
     const request = require('request');
 
-    const opts = {
-      url: 'https://api.github.com/orgs/syntaxhighlighter/repos?per_page=300',
-      json: true,
-      headers: { 'User-Agent': 'node.js' },
-    };
-
-    return new Promise((resolve, reject) =>
+    const REPOS = [
+      {url:'https://api.github.com/orgs/syntaxhighlighter/repos?per_page=300'},
+      {url:'https://api.github.com/repos/npedotnet/syntaxhighlighter-brush-mel', link_name:'brush-mel'},
+      {url:'https://api.github.com/repos/npedotnet/syntaxhighlighter-theme-maya',link_name:'theme-maya'}
+    ];
+    var json;
+    var repoIndex = 0;
+    function requestJSON(resolve, reject) {
+      const opts = {
+        url: REPOS[repoIndex].url,
+        json: true,
+        headers: { 'User-Agent': 'node.js' },
+      };
       request(opts, (err, response) => {
         if (err) return reject(err);
-        const json = response.body;
-        fs.writeFile(REPOS_CACHE, JSON.stringify(json, null, 2));
-        resolve(json);
-      })
-    );
+        if(REPOS[repoIndex].link_name) response.body.link_name = REPOS[repoIndex].link_name;
+        if(json) json.push(response.body);
+        else json = response.body;
+        repoIndex++;
+        if(repoIndex == REPOS.length) {
+          fs.writeFile(REPOS_CACHE, JSON.stringify(json, null, 2));
+          resolve(json);
+        }
+        else requestJSON(resolve, reject);
+      });
+    }
+    return new Promise((resolve, reject) => requestJSON(resolve, reject));
   }
 
   const exec = (cmd, opts) =>
@@ -36,12 +49,18 @@ export default function (gulp, rootPath) {
 
   const git = (cmd, cwd) => exec(`git ${cmd}`, {cwd});
   const loadReposFromCache = () => fs.readFile.promise(REPOS_CACHE, 'utf8').then(JSON.parse);
-  const loadRepos = () => loadReposFromCache().error(loadReposFromGitHub).then(R.map(R.pick(['clone_url', 'name'])));
+  const loadRepos = () => loadReposFromCache().error(loadReposFromGitHub).then(R.map(R.pick(['clone_url', 'name', 'link_name'])));
   const cloneRepo = repo => git(`clone ${repo.clone_url}`, REPOS_DIR);
   const pathToRepo = repo => `${REPOS_DIR}/${repo.name}`;
   const ln = (source, dest) => rimraf.promise(dest).finally(() => exec(`ln -s ${source} ${dest} || true`));
   const linkNodeModulesIntoRepos = repo => ln(`${rootPath}/node_modules`, `${pathToRepo(repo)}/node_modules`);
-  const linkReposIntoNodeModules = repo => ln(pathToRepo(repo), `${rootPath}/node_modules/${repo.name}`);
+  const linkReposIntoNodeModules = repo => {
+    ln(pathToRepo(repo), `${rootPath}/node_modules/${repo.name}`);
+    if(repo.link_name && repo.link_name !== repo.name) {
+      ln(pathToRepo(repo), `${REPOS_DIR}/${repo.link_name}`);
+      ln(pathToRepo(repo), `${rootPath}/node_modules/${repo.link_name}`);
+    }
+  }
   const unlinkReposFromNodeModules = repo => fs.promise.unlink(`${rootPath}/node_modules/${repo.name}`);
 
   gulp.task('setup-project:clone-repos', 'Clones all repositories from SyntaxHighlighter GitHub organization', () =>
