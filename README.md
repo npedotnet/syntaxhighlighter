@@ -1,3 +1,29 @@
+This branch supports external brush and theme repos.
+
+<img src="sample/screenshot.png"/>
+
+## Customize
+
+Add external brush and theme repos to 'REPOS' variable in build/setup-project.js.
+
+```js
+const REPOS = [
+  {url:'https://api.github.com/orgs/syntaxhighlighter/repos?per_page=300'},
+  {url:'https://api.github.com/repos/npedotnet/syntaxhighlighter-brush-mel', link_name:'brush-mel'},
+  {url:'https://api.github.com/repos/npedotnet/syntaxhighlighter-theme-maya',link_name:'theme-maya'}
+];
+```
+
+## Build
+
+```
+git clone https://github.com/npedotnet/syntaxhighlighter
+cd syntaxhighlighter
+npm install
+gulp setup-project
+gulp build --brushes=mel --theme=maya
+```
+
 # SyntaxHighlighter v4
 
 [![GratiPay](https://img.shields.io/gratipay/user/alexgorbatchev.svg)](https://gratipay.com/alexgorbatchev/)
